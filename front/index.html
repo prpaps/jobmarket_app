@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Job Search</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header>
+      <h1>Moteur de recherche d'offres</h1>
+	<form id="search-form">
+	  <input
+		id="query-input"
+		type="text"
+		placeholder="Rechercher un poste, une compétence..."
+	  />
+	  <input
+		id="city-input"
+		type="text"	
+		placeholder="Ville (optionnel)"
+	  />
+	  <button type="submit">Rechercher</button>
+	</form>
+      <div id="status"></div>
+    </header>
+
+    <main class="layout">
+      <section class="results-panel">
+        <h2>Résultats</h2>
+        <div id="results"></div>
+      </section>
+
+      <section class="detail-panel">
+        <h2>Détail de l'offre</h2>
+        <div id="detail"></div>
+      </section>
+    </main>
+
+    <script src="src/main.js"></script>
+  </body>
+</html>
