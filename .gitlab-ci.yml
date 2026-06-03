@@ -1,3 +1,11 @@
+stages:
+  - ingest
+
+image: python:3.11
+
+variables:
+  PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
+
 before_script:
   - python3 --version
   - pip3 install --upgrade pip
