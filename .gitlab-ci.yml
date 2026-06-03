@@ -1,21 +1,13 @@
-image: python:3.11
-
-stages:
-  - ingest
-
-variables:
-  PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
-
 before_script:
-  - python --version
-  - pip install --upgrade pip
-  - pip install -r requirements.txt
+  - python3 --version
+  - pip3 install --upgrade pip
+  - pip3 install -r requirements.txt
 
 ingest_francetravail_production:
   stage: ingest
   tags:
     - shell
   script:
-    - python -m pipelines.ingest_francetravail
+    - python3 -m pipelines.ingest_francetravail
   only:
     - production
