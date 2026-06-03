@@ -1,21 +1,23 @@
 stages:
   - ingest
 
-image: python:3.11
-
 variables:
   PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
+  VENV_PATH: "$CI_PROJECT_DIR/.venv"
 
 before_script:
   - python3 --version
-  - pip3 install --upgrade pip
-  - pip3 install -r requirements.txt
+  - python3 -m venv "$VENV_PATH"
+  - source "$VENV_PATH/bin/activate"
+  - pip install --upgrade pip
+  - pip install -r requirements.txt
 
 ingest_francetravail_production:
   stage: ingest
   tags:
     - shell
   script:
-    - python3 -m pipelines.ingest_francetravail
+    - source "$VENV_PATH/bin/activate"
+    - python -m pipelines.ingest_francetravail
   only:
     - production
