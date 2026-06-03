@@ -48,9 +48,9 @@ def get_or_create_company(cur, entreprise: dict):
     """
     Insert or fetch a company id from app.company based on the name.
     Requires:
-      - app.company.company_id (PK)
-      - app.company.name (text)
-      - app.company.name_fingerprint char(64) UNIQUE
+    - app.company.company_id (PK)
+    - app.company.name (text)
+    - app.company.name_fingerprint char(64) UNIQUE
     """
     if not entreprise:
         return None
@@ -73,29 +73,27 @@ def get_or_create_company(cur, entreprise: dict):
         """,
         (name, fp),
     )
+
     row = cur.fetchone()
     return row["company_id"] if row else None
 
 
-def get_or_create_location(cur, lieu_travail: dict):
+def get_or_create_location(cur, lieu_travail: dict, departement: str | None = None):
     """
     Insert or fetch a location_id from app.location based on:
-      - postal_code
-      - insee_code (when commune looks numeric)
-      - city_label (display label)
-    Requires:
-      - app.location.location_id (PK)
-      - app.location.postal_code text
-      - app.location.city text (legacy raw field)
-      - app.location.insee_code text
-      - app.location.city_label text
-      - app.location.location_fingerprint char(64) UNIQUE
+    - postal_code
+    - city (raw_commune)
+    - department_code
+    - region
+    - country
+
+    This matches the UNIQUE constraint:
+    (city, department_code, region, country, postal_code)
     """
     if not lieu_travail:
         return None
 
     postal_code = lieu_travail.get("codePostal")
-
     raw_commune = lieu_travail.get("commune")
     raw_label = lieu_travail.get("libelle") or raw_commune
 
@@ -112,8 +110,15 @@ def get_or_create_location(cur, lieu_travail: dict):
     if not postal_code and not city_label and not insee_code:
         return None
 
-    key = f"{(postal_code or '').strip()}|{(insee_code or '').strip()}|{(city_label or '').strip().lower()}"
-    fp = hashlib.sha256(key.encode("utf-8")).hexdigest()
+    # Fields used in the UNIQUE constraint
+    city = raw_commune  # legacy raw field
+    department_code = departement  # comes from DEFAULT_DEPARTMENTS
+    region = None  # could be enriched later
+    country = "France"
+
+    # Still keep a fingerprint for convenience/debug, even if not used in UNIQUE
+    key = f"{(postal_code or '').strip()}|{(city or '')}|{(department_code or '')}|{(region or '')}|{country}"
+    location_fp = hashlib.sha256(key.encode("utf-8")).hexdigest()
 
     cur.execute(
         """
@@ -122,24 +127,32 @@ def get_or_create_location(cur, lieu_travail: dict):
             city,
             insee_code,
             city_label,
-            location_fingerprint
+            location_fingerprint,
+            department_code,
+            region,
+            country
         )
-        VALUES (%s, %s, %s, %s, %s)
-        ON CONFLICT (location_fingerprint) DO UPDATE
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+        ON CONFLICT (city, department_code, region, country, postal_code) DO UPDATE
         SET postal_code = EXCLUDED.postal_code,
             city = EXCLUDED.city,
             insee_code = EXCLUDED.insee_code,
-            city_label = EXCLUDED.city_label
+            city_label = EXCLUDED.city_label,
+            location_fingerprint = EXCLUDED.location_fingerprint
         RETURNING location_id;
         """,
         (
             postal_code,
-            raw_commune,  # legacy raw field
+            city,
             insee_code,
             city_label,
-            fp,
+            location_fp,
+            department_code,
+            region,
+            country,
         ),
     )
+
     row = cur.fetchone()
     return row["location_id"] if row else None
 
@@ -149,7 +162,6 @@ def save_offer(cur, offer, departement: str) -> None:
     Map one France Travail offer to app.job_offer with enriched fields
     and normalized company and location.
     """
-
     external_id = offer.get("id")
     title = offer.get("intitule")
     description = offer.get("description")
@@ -180,7 +192,7 @@ def save_offer(cur, offer, departement: str) -> None:
     lieu_travail = offer.get("lieuTravail") or {}
 
     company_id = get_or_create_company(cur, entreprise)
-    location_id = get_or_create_location(cur, lieu_travail)
+    location_id = get_or_create_location(cur, lieu_travail, departement)
 
     if not external_id or not title:
         return
@@ -211,23 +223,23 @@ def save_offer(cur, offer, departement: str) -> None:
             remote_type
         )
         VALUES (
-            %s,       -- source_id
-            NULL,     -- run_id
-            %s,       -- company_id
-            %s,       -- location_id
-            %s,       -- external_id
-            %s,       -- fingerprint
-            %s,       -- title
-            %s,       -- description
-            %s,       -- contract_type
-            %s,       -- contract_nature
-            %s,       -- salary_min
-            %s,       -- salary_max
-            %s,       -- salary_currency
-            %s,       -- salary_text
-            %s,       -- experience_required
-            %s,       -- sector
-            %s        -- remote_type
+            %s, -- source_id
+            NULL, -- run_id
+            %s, -- company_id
+            %s, -- location_id
+            %s, -- external_id
+            %s, -- fingerprint
+            %s, -- title
+            %s, -- description
+            %s, -- contract_type
+            %s, -- contract_nature
+            %s, -- salary_min
+            %s, -- salary_max
+            %s, -- salary_currency
+            %s, -- salary_text
+            %s, -- experience_required
+            %s, -- sector
+            %s  -- remote_type
         )
         ON CONFLICT (fingerprint) DO UPDATE
         SET title = EXCLUDED.title,
